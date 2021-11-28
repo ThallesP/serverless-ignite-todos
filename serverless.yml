@@ -1,0 +1,75 @@
+service: "serverless-ignite-todos"
+
+provider:
+  name: aws
+  runtime: nodejs14.x
+  region: us-east-1
+  lambdaHashingVersion: "20201221"
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - "dynamodb:PutItem"
+            - "dynamodb:Query"
+          Resource:
+            - "arn:aws:dynamodb:${self:provider.region}:*:table/users_todos"
+            - "arn:aws:dynamodb:${self:provider.region}:*:table/users_todos/index/user_id_index"
+
+plugins:
+  - "serverless-esbuild"
+  - "serverless-dynamodb-local"
+  - "serverless-offline"
+
+functions:
+  createTodo:
+    handler: src/functions/createTodo.handler
+    events:
+      - http:
+          path: "todos/{user_id}"
+          method: "POST"
+          cors: true
+  getTodo:
+    handler: src/functions/getTodo.handler
+    events:
+      - http:
+          path: "todos/{user_id}"
+          method: "GET"
+          cors: true
+
+custom:
+  dynamodb:
+    stages:
+      - dev
+    start:
+      inMemory: true
+      port: 8000
+      migrate: true
+
+resources:
+  Resources:
+    dbUsersTodos:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: users_todos
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: user_id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: user_id_index
+            Projection:
+              ProjectionType: ALL
+            ProvisionedThroughput:
+              ReadCapacityUnits: 5
+              WriteCapacityUnits: 5
+            KeySchema:
+              - AttributeName: user_id
+                KeyType: HASH
